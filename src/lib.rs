@@ -57,6 +57,32 @@ use newline_converter::dos2unix;
 use similar::{Algorithm, ChangeTag, TextDiff};
 use std::{env, ffi::OsStr, fs, path::Path};
 
+/// Compare the contents of an image file to the bytes provided
+#[track_caller]
+pub fn assert_img_contents<P: AsRef<Path>>(path: P, actual: &[u8]) {
+    let path = path.as_ref();
+    let var = env::var_os("EXPECTORATE");
+    let overwrite = var.as_deref().and_then(OsStr::to_str) == Some("overwrite");
+
+    if overwrite {
+        if let Err(e) = fs::write(path, actual) {
+            panic!("unable to write to {}: {}", path.display(), e);
+        }
+    } else {
+        let expected = match fs::read(path) {
+            Ok(s) => s,
+            Err(e) => panic!("unable to read contents of {}: {}", path.display(), e),
+        };
+
+        if expected != actual {
+            panic!(
+                "image doesn't match the contents of file: {:?}. set EXPECTORATE=overwrite if these changes are intentional",
+                path.display()
+            );
+        }
+    }
+}
+
 /// Compare the contents of the file to the string provided
 #[track_caller]
 pub fn assert_contents<P: AsRef<Path>>(path: P, actual: &str) {
